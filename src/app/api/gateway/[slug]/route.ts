@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateApiKey, incrementUsage } from "@/lib/gateway";
+import { validateApiKey, incrementUsage, writeRequestLog } from "@/lib/gateway";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -85,22 +85,20 @@ export async function POST(
     // Calculate duration
     const duration = Date.now() - startTime;
 
-    // Log the request
-    await prisma.requestLog.create({
-      data: {
-        apiKeyId: keyData.id,
-        skillId: skill.id,
-        userId: keyData.userId,
-        method,
-        path: requestPath,
-        statusCode: upstreamResponse.status,
-        duration,
-        ip,
-      },
+    // Log the request (non-blocking)
+    writeRequestLog({
+      apiKeyId: keyData.id,
+      skillId: skill.id,
+      userId: keyData.userId,
+      method,
+      path: requestPath,
+      statusCode: upstreamResponse.status,
+      duration,
+      ip,
     });
 
-    // Increment usage
-    await incrementUsage(keyData.id);
+    // Increment usage (non-blocking)
+    incrementUsage(keyData.id);
 
     // Build response with rate limit headers
     const remainingQuota = keyData.totalQuota > 0
@@ -122,19 +120,17 @@ export async function POST(
   } catch (error) {
     console.error("Gateway proxy error:", error);
 
-    // Log failed request
-    await prisma.requestLog.create({
-      data: {
-        apiKeyId: keyData.id,
-        skillId: skill.id,
-        userId: keyData.userId,
-        method,
-        path: requestPath,
-        statusCode: 502,
-        errorMsg: error instanceof Error ? error.message : "Upstream Error",
-        duration: Date.now() - startTime,
-        ip,
-      },
+    // Log failed request (non-blocking)
+    writeRequestLog({
+      apiKeyId: keyData.id,
+      skillId: skill.id,
+      userId: keyData.userId,
+      method,
+      path: requestPath,
+      statusCode: 502,
+      errorMsg: error instanceof Error ? error.message : "Upstream Error",
+      duration: Date.now() - startTime,
+      ip,
     });
 
     return NextResponse.json(

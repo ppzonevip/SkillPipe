@@ -24,6 +24,10 @@ interface ValidationResult {
   apiKey?: ApiKeyCache;
 }
 
+// In-memory cache for validation results (short TTL for high-frequency checks)
+const validationCache = new Map<string, { result: ValidationResult; timestamp: number }>();
+const VALIDATION_CACHE_TTL = 5000; // 5 seconds
+
 export async function validateApiKey(apiKey: string): Promise<ValidationResult> {
   // 1. Check if key is provided
   if (!apiKey) {
@@ -34,7 +38,13 @@ export async function validateApiKey(apiKey: string): Promise<ValidationResult> 
     };
   }
 
-  // Try to get from cache first
+  // Check in-memory validation cache first (avoid repeated validation within short time)
+  const cached = validationCache.get(apiKey);
+  if (cached && Date.now() - cached.timestamp < VALIDATION_CACHE_TTL) {
+    return cached.result;
+  }
+
+  // Try to get from Redis cache first
   const cacheKey = `apikey:${apiKey}`;
   let keyData: ApiKeyCache | null = await cacheGet(cacheKey);
 
@@ -63,11 +73,13 @@ export async function validateApiKey(apiKey: string): Promise<ValidationResult> 
     });
 
     if (!dbKey) {
-      return {
+      const result = {
         valid: false,
         error: "Invalid API Key",
         errorCode: 403,
       };
+      validationCache.set(apiKey, { result, timestamp: Date.now() });
+      return result;
     }
 
     // Build cache object
@@ -87,34 +99,38 @@ export async function validateApiKey(apiKey: string): Promise<ValidationResult> 
       userRole: dbKey.user.role,
     };
 
-    // Cache for 5 minutes
+    // Cache in Redis for 5 minutes
     await cacheSet(cacheKey, keyData, 300);
   }
 
   // 2. Check key status
   if (keyData.status !== "ACTIVE") {
-    return {
+    const result = {
       valid: false,
       error: `Key ${keyData.status.toLowerCase()}`,
       errorCode: 403,
     };
+    validationCache.set(apiKey, { result, timestamp: Date.now() });
+    return result;
   }
 
   // 3. Check key expiration
   if (keyData.expireAt) {
     const expireTime = new Date(keyData.expireAt);
     if (new Date() > expireTime) {
-      // Mark as expired in DB
-      await prisma.apiKey.update({
+      // Mark as expired in DB (non-blocking)
+      prisma.apiKey.update({
         where: { id: keyData.id },
         data: { status: "EXPIRED" },
-      });
+      }).catch(console.error);
       await cacheDel(cacheKey);
-      return {
+      const result = {
         valid: false,
         error: "Key Expired",
         errorCode: 403,
       };
+      validationCache.set(apiKey, { result, timestamp: Date.now() });
+      return result;
     }
   }
 
@@ -127,49 +143,78 @@ export async function validateApiKey(apiKey: string): Promise<ValidationResult> 
         where: { key: "member_lock_on_expire" },
       });
       if (lockConfig?.value === "true") {
-        return {
+        const result = {
           valid: false,
           error: "Developer Membership Expired",
           errorCode: 403,
         };
+        validationCache.set(apiKey, { result, timestamp: Date.now() });
+        return result;
       }
     }
   }
 
   // 5. Check quota
   if (keyData.totalQuota > 0 && keyData.usedQuota >= keyData.totalQuota) {
-    return {
+    const result = {
       valid: false,
       error: "Quota Exceeded",
       errorCode: 403,
     };
+    validationCache.set(apiKey, { result, timestamp: Date.now() });
+    return result;
   }
 
-  return {
+  const result = {
     valid: true,
     apiKey: keyData,
   };
+  validationCache.set(apiKey, { result, timestamp: Date.now() });
+  return result;
 }
 
-export async function incrementUsage(apiKeyId: string): Promise<void> {
-  try {
-    await prisma.apiKey.update({
-      where: { id: apiKeyId },
-      data: {
-        usedQuota: {
-          increment: 1,
-        },
+// Non-blocking usage increment
+export function incrementUsage(apiKeyId: string): void {
+  // Fire and forget - don't await
+  prisma.apiKey.update({
+    where: { id: apiKeyId },
+    data: {
+      usedQuota: {
+        increment: 1,
       },
-    });
-    // Invalidate cache
-    const dbKey = await prisma.apiKey.findUnique({
-      where: { id: apiKeyId },
-      select: { keyBody: true },
-    });
+    },
+  }).catch((error) => {
+    console.error("Failed to increment usage:", error);
+  });
+
+  // Invalidate cache in background
+  prisma.apiKey.findUnique({
+    where: { id: apiKeyId },
+    select: { keyBody: true },
+  }).then(async (dbKey) => {
     if (dbKey) {
       await cacheDel(`apikey:${dbKey.keyBody}`);
+      validationCache.delete(dbKey.keyBody);
     }
-  } catch (error) {
-    console.error("Failed to increment usage:", error);
-  }
+  }).catch(console.error);
+}
+
+// Non-blocking log writing
+export function writeRequestLog(data: {
+  apiKeyId: string;
+  skillId: string;
+  userId: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  errorMsg?: string;
+  duration: number;
+  ip?: string;
+}): void {
+  // Fire and forget - don't await
+  prisma.requestLog.create({
+    data,
+  }).catch((error) => {
+    console.error("Failed to write request log:", error);
+  });
 }
