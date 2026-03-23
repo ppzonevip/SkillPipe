@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  passwordHash      String
+  avatar            String?
+  role              String    @default("USER")
+  membershipTier    Int       @default(0)
+  membershipExpireAt DateTime?
+  apiQuotaLimit     Int       @default(100)
+  apiQuotaUsed      Int       @default(0)
+  balance           Float     @default(0)
+
+  skills            Skill[]
+  apiKeys           ApiKey[]
+  orders            Order[]
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  targetUrl   String
+  customSlug  String   @unique
+  isActive    Boolean  @default(true)
+
+  user        User     @relation(fields: [userId], references: [id])
+  apiKeys     ApiKey[]
+  logs        RequestLog[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  skillId     String
+  userId      String
+  keyBody     String   @unique
+  prefix      String
+  status      String   @default("ACTIVE")
+  expireAt    DateTime?
+  totalQuota  Int      @default(0)
+  usedQuota   Int      @default(0)
+
+  skill       Skill    @relation(fields: [skillId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+  logs        RequestLog[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id          String    @id @default(cuid())
+  userId      String
+  orderNo     String    @unique
+  amount      Float
+  tier        Int
+  period      String
+  status      String    @default("PENDING")
+  paidAt      DateTime?
+
+  user        User      @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model RequestLog {
+  id          String   @id @default(cuid())
+  apiKeyId    String
+  skillId     String
+  userId      String
+  method      String
+  path        String
+  statusCode  Int
+  errorMsg    String?
+  duration    Int
+  ip          String?
+
+  apiKey      ApiKey   @relation(fields: [apiKeyId], references: [id])
+  skill       Skill    @relation(fields: [skillId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  @@index([apiKeyId])
+  @@index([skillId])
+  @@index([createdAt])
+}
