@@ -90,18 +90,18 @@ export default async function DashboardPage() {
               在卡密工厂批量生成密钥，设置有效期和额度
             </p>
           </Link>
-          <div className="p-4 bg-[#0a0a0a] rounded-lg">
-            <h3 className="text-white font-medium mb-2">3. 分发给用户</h3>
+          <Link href="/logs" className="p-4 bg-[#0a0a0a] rounded-lg hover:bg-[#1a1a1a] transition-colors">
+            <h3 className="text-white font-medium mb-2">3. 查看日志</h3>
             <p className="text-gray-400 text-sm mb-3">
-              将 API Key 提供给你的终端用户
+              监控 API 请求记录和错误日志
             </p>
-          </div>
-          <div className="p-4 bg-[#0a0a0a] rounded-lg">
-            <h3 className="text-white font-medium mb-2">4. 开始变现</h3>
+          </Link>
+          <Link href="/billing" className="p-4 bg-[#0a0a0a] rounded-lg hover:bg-[#1a1a1a] transition-colors">
+            <h3 className="text-white font-medium mb-2">4. 开通会员</h3>
             <p className="text-gray-400 text-sm mb-3">
-              用户使用 API 时自动扣减配额
+              升级会员获取更多配额和功能
             </p>
-          </div>
+          </Link>
         </div>
       </Card>
     </div>
