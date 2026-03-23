@@ -25,7 +25,7 @@
 - **前端**: Next.js 14+ (App Router)
 - **样式**: Tailwind CSS
 - **数据库 ORM**: Prisma
-- **数据库**: SQLite（开发）/ PostgreSQL（生产）
+- **数据库**: PostgreSQL
 - **缓存**: Redis（用于 API Key 高频校验）
 - **认证**: NextAuth.js (Auth.js) + JWT + HttpOnly Cookie
 - **支付**: 支付宝/微信支付官方 API + 易支付兼容
@@ -476,8 +476,8 @@ POST/GET api.yourdomain.com/v1/proxy/[slug]
 ## 8. 环境变量 (.env)
 
 ```env
-# Database
-DATABASE_URL="file:./dev.db"
+# Database (PostgreSQL)
+DATABASE_URL="postgresql://user:password@localhost:5432/skillpipe?schema=public"
 
 # Redis
 REDIS_URL="redis://localhost:6379"
