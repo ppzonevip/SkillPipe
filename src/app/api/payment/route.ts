@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 
@@ -9,8 +9,8 @@ function generateOrderNo(): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     // Create order
     const order = await prisma.order.create({
       data: {
-        userId: session.user.id,
+        userId: session.id,
         orderNo: generateOrderNo(),
         amount,
         tier,
@@ -97,13 +97,13 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
     const orders = await prisma.order.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.id },
       orderBy: { createdAt: "desc" },
     });
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 function generateKey(prefix: string): string {
@@ -21,8 +21,8 @@ function calculateExpireAt(days: number): Date | null {
 // POST - Generate new API keys
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     // Check skill ownership
     const skill = await prisma.skill.findFirst({
-      where: { id: skillId, userId: session.user.id },
+      where: { id: skillId, userId: session.id },
     });
 
     if (!skill) {
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     const createdKeys = await prisma.apiKey.createMany({
       data: keys.map((k) => ({
         skillId,
-        userId: session.user.id,
+        userId: session.id,
         keyBody: k.keyBody,
         prefix: `pm-${prefix}`,
         status: "ACTIVE",
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     const keysWithMeta = await prisma.apiKey.findMany({
       where: {
         skillId,
-        userId: session.user.id,
+        userId: session.id,
       },
       orderBy: { createdAt: "desc" },
       take: count,

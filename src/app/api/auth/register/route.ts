@@ -4,11 +4,18 @@ import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json();
+    const { username, email, password } = await req.json();
 
-    if (!email || !password) {
+    if (!username || !email || !password) {
       return NextResponse.json(
-        { error: "邮箱和密码不能为空" },
+        { error: "用户名、邮箱和密码不能为空" },
+        { status: 400 }
+      );
+    }
+
+    if (username.length < 2) {
+      return NextResponse.json(
+        { error: "用户名至少2个字符" },
         { status: 400 }
       );
     }
@@ -20,17 +27,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
+    // Check if email exists
+    const existingEmail = await prisma.user.findUnique({
       where: { email },
     });
 
-    if (existingUser) {
+    if (existingEmail) {
       return NextResponse.json(
         { error: "该邮箱已注册" },
         { status: 409 }
       );
     }
 
+    // Create user (username is stored in email field for now as we don't have a username field)
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
@@ -48,6 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       id: user.id,
       email: user.email,
+      message: "注册成功",
     });
   } catch (error) {
     console.error("Register error:", error);

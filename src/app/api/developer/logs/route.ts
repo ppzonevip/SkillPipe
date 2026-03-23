@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
     const skillId = searchParams.get("skillId");
 
     const where = skillId
-      ? { skillId, userId: session.user.id }
-      : { userId: session.user.id };
+      ? { skillId, userId: session.id }
+      : { userId: session.id };
 
     const [logs, total] = await Promise.all([
       prisma.requestLog.findMany({

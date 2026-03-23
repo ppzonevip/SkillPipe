@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET - List all skills for current user
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
     const skills = await prisma.skill.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.id },
       include: {
         _count: {
           select: { apiKeys: true },
@@ -30,8 +30,8 @@ export async function GET() {
 // POST - Create a new skill
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     const skill = await prisma.skill.create({
       data: {
-        userId: session.user.id,
+        userId: session.id,
         name,
         description,
         targetUrl,

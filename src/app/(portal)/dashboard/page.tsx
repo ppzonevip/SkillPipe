@@ -1,18 +1,30 @@
-import { auth } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.AUTH_SECRET || "fallback-secret";
 
 export default async function DashboardPage() {
-  const session = await auth();
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
 
-  if (!session?.user?.id) {
+  if (!token) {
+    redirect("/login");
+  }
+
+  let userId: string;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+    userId = decoded.id;
+  } catch {
     redirect("/login");
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     include: {
       skills: {
         include: {

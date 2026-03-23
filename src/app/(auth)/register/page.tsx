@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
@@ -11,33 +10,55 @@ import { Button } from "@/components/ui/button";
 export default function RegisterPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [form, setForm] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (password !== confirmPassword) {
-      setError("两次输入的密码不一致");
+    if (!form.username || !form.email || !form.password) {
+      setError("请填写所有必填项");
       return;
     }
 
-    if (password.length < 6) {
+    if (form.username.length < 2) {
+      setError("用户名至少2个字符");
+      return;
+    }
+
+    if (form.password.length < 6) {
       setError("密码长度至少6位");
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setError("两次输入的密码不一致");
       return;
     }
 
     setLoading(true);
 
     try {
+      // Register
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          username: form.username,
+          email: form.email,
+          password: form.password,
+        }),
       });
 
       const data = await res.json();
@@ -47,18 +68,25 @@ export default function RegisterPage() {
         return;
       }
 
-      // Auto login after register
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
+      // Auto login
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
       });
 
-      if (result?.error) {
-        setError("注册成功但登录失败，请手动登录");
-      } else {
+      const loginData = await loginRes.json();
+
+      if (loginRes.ok && loginData.token) {
+        // Store token in localStorage for demo
+        localStorage.setItem("token", loginData.token);
         router.push("/dashboard");
-        router.refresh();
+      } else {
+        setError("注册成功，请登录");
+        router.push("/login");
       }
     } catch {
       setError("注册失败，请重试");
@@ -77,44 +105,56 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
+            id="username"
+            name="username"
+            type="text"
+            label="用户名"
+            placeholder="输入用户名"
+            value={form.username}
+            onChange={handleChange}
+            required
+          />
+
+          <Input
             id="email"
+            name="email"
             type="email"
             label="邮箱"
             placeholder="your@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            value={form.email}
+            onChange={handleChange}
             required
           />
 
           <Input
             id="password"
+            name="password"
             type="password"
             label="密码"
             placeholder="至少6位"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            value={form.password}
+            onChange={handleChange}
             required
           />
 
           <Input
             id="confirmPassword"
+            name="confirmPassword"
             type="password"
             label="确认密码"
             placeholder="再次输入密码"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
+            value={form.confirmPassword}
+            onChange={handleChange}
             required
           />
 
           {error && (
-            <p className="text-sm text-red-500 text-center">{error}</p>
+            <p className="text-sm text-red-500 text-center bg-red-500/10 py-2 rounded">
+              {error}
+            </p>
           )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-          >
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "注册中..." : "注册"}
           </Button>
         </form>

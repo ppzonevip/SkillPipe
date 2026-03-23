@@ -1,73 +1,61 @@
-import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import { prisma } from "./prisma";
-import bcrypt from "bcryptjs";
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  session: {
-    strategy: "jwt",
-  },
-  pages: {
-    signIn: "/login",
-  },
-  providers: [
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
+const JWT_SECRET = process.env.AUTH_SECRET || "fallback-secret";
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        });
+export interface SessionUser {
+  id: string;
+  email: string;
+  role: string;
+  membershipTier: number;
+  balance: number;
+}
 
-        if (!user) {
-          return null;
-        }
+// For API routes - get user from request
+export async function getSessionFromRequest(req: NextRequest): Promise<SessionUser | null> {
+  const token = req.cookies.get("token")?.value;
 
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password as string,
-          user.passwordHash
-        );
+  if (!token) {
+    return null;
+  }
 
-        if (!isPasswordValid) {
-          return null;
-        }
+  try {
+    return jwt.verify(token, JWT_SECRET) as SessionUser;
+  } catch {
+    return null;
+  }
+}
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.email.split("@")[0],
-          role: user.role,
-          membershipTier: user.membershipTier,
-          balance: user.balance,
-        };
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as any).role;
-        token.membershipTier = (user as any).membershipTier;
-        token.balance = (user as any).balance;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.membershipTier = token.membershipTier as number;
-        session.user.balance = token.balance as number;
-      }
-      return session;
-    },
-  },
-});
+// For server components - get user from cookies
+export async function getSession(): Promise<SessionUser | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return jwt.verify(token, JWT_SECRET) as SessionUser;
+  } catch {
+    return null;
+  }
+}
+
+// Create session response with cookie
+export function createSessionResponse(user: SessionUser): NextResponse {
+  const token = jwt.sign(user, JWT_SECRET, { expiresIn: "7d" });
+
+  const response = NextResponse.json({ user });
+
+  response.cookies.set("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 7,
+    path: "/",
+  });
+
+  return response;
+}

@@ -1,19 +1,30 @@
-import { auth } from "@/lib/auth";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.AUTH_SECRET || "fallback-secret";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
 
-  if (!session?.user?.id) {
+  if (!token) {
     redirect("/login");
   }
 
-  if (session.user.role !== "ADMIN") {
+  let user: { id: string; role: string };
+  try {
+    user = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
+  } catch {
+    redirect("/login");
+  }
+
+  if (user.role !== "ADMIN") {
     redirect("/dashboard");
   }
 

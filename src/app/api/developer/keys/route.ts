@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET - List all API keys for current user
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
     const keys = await prisma.apiKey.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.id },
       include: {
         skill: {
           select: {
@@ -33,8 +33,8 @@ export async function GET() {
 // DELETE - Delete an API key
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -47,7 +47,7 @@ export async function DELETE(req: NextRequest) {
 
     // Check ownership
     const existing = await prisma.apiKey.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: session.id },
     });
 
     if (!existing) {

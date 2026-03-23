@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -9,8 +9,8 @@ interface RouteParams {
 // GET - Get single skill
 export async function GET(req: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     const skill = await prisma.skill.findFirst({
       where: {
         id,
-        userId: session.user.id,
+        userId: session.id,
       },
       include: {
         apiKeys: {
@@ -42,8 +42,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 // PUT - Update skill
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -52,7 +52,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 
     // Check ownership
     const existing = await prisma.skill.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: session.id },
     });
 
     if (!existing) {
@@ -79,8 +79,8 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
 // DELETE - Delete skill
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id) {
       return NextResponse.json({ error: "未登录" }, { status: 401 });
     }
 
@@ -88,7 +88,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 
     // Check ownership
     const existing = await prisma.skill.findFirst({
-      where: { id, userId: session.user.id },
+      where: { id, userId: session.id },
     });
 
     if (!existing) {

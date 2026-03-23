@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getSessionFromRequest } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET - Get all system configs
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id || session.role !== "ADMIN") {
       return NextResponse.json({ error: "无权限" }, { status: 403 });
     }
 
@@ -27,8 +27,8 @@ export async function GET() {
 // PUT - Update system config
 export async function PUT(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    const session = await getSessionFromRequest(req);
+    if (!session?.id || session.role !== "ADMIN") {
       return NextResponse.json({ error: "无权限" }, { status: 403 });
     }
 
