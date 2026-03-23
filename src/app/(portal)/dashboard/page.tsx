@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 
 export default async function DashboardPage() {
@@ -77,18 +78,18 @@ export default async function DashboardPage() {
       <Card>
         <h2 className="text-lg font-semibold text-white mb-4">快速开始</h2>
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="p-4 bg-[#0a0a0a] rounded-lg">
+          <Link href="/skills" className="p-4 bg-[#0a0a0a] rounded-lg hover:bg-[#1a1a1a] transition-colors">
             <h3 className="text-white font-medium mb-2">1. 创建项目</h3>
             <p className="text-gray-400 text-sm mb-3">
               添加你的 AI 服务，配置目标 URL 和 Slug
             </p>
-          </div>
-          <div className="p-4 bg-[#0a0a0a] rounded-lg">
+          </Link>
+          <Link href="/keys" className="p-4 bg-[#0a0a0a] rounded-lg hover:bg-[#1a1a1a] transition-colors">
             <h3 className="text-white font-medium mb-2">2. 生成 API Key</h3>
             <p className="text-gray-400 text-sm mb-3">
               在卡密工厂批量生成密钥，设置有效期和额度
             </p>
-          </div>
+          </Link>
           <div className="p-4 bg-[#0a0a0a] rounded-lg">
             <h3 className="text-white font-medium mb-2">3. 分发给用户</h3>
             <p className="text-gray-400 text-sm mb-3">
